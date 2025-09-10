@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAMX API Explorer</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { background-color: #0f172a; color: #f1f5f9; }
+    .card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .btn { background: #6366f1; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.9rem; }
+    .btn:hover { background: #4f46e5; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="p-4 bg-gray-900 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-indigo-400">VAMX API</h1>
+    <nav>
+      <a href="/" class="text-gray-300 hover:text-white px-3">Home</a>
+      <a href="/docs" class="text-gray-300 hover:text-white px-3">Docs</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="p-6 text-center">
+    <h2 class="text-2xl font-bold mb-2 text-indigo-300">VAMX API Explorer</h2>
+    <p class="text-gray-400 mb-4">Explore all available endpoints and test them directly using the <b>Try It</b> feature.</p>
+    <div class="bg-gray-800 p-3 rounded-md inline-block">
+      <span class="text-sm text-gray-400">Base URL:</span>
+      <code class="block text-indigo-400">https://vamx.com/api</code>
+    </div>
+  </section>
+
+  <!-- Search + Category -->
+  <section class="p-6 max-w-4xl mx-auto w-full">
+    <input id="search" type="text" placeholder="Search endpoints..."
+      class="w-full p-3 mb-6 rounded bg-gray-800 text-gray-200 outline-none focus:ring-2 focus:ring-indigo-500">
+
+    <div id="categories" class="flex gap-4 flex-wrap mb-6"></div>
+
+    <div id="endpoints" class="grid gap-4"></div>
+  </section>
+
+  <!-- Try It Modal -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center">
+    <div class="bg-gray-900 rounded-lg shadow-xl p-6 w-full max-w-2xl">
+      <h3 class="text-lg font-bold mb-4" id="modal-title"></h3>
+      <pre id="modal-response" class="bg-gray-800 p-4 rounded text-sm text-green-400 overflow-auto max-h-80"></pre>
+      <button onclick="closeModal()" class="btn mt-4">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const endpointContainer = document.getElementById("endpoints");
+    const categoriesContainer = document.getElementById("categories");
+    const searchInput = document.getElementById("search");
+    const modal = document.getElementById("modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalResponse = document.getElementById("modal-response");
+
+    let endpoints = {};
+    let activeCategory = "All";
+
+    async function loadEndpoints() {
+      try {
+        const res = await axios.get("/endpoints");
+        endpoints = res.data;
+        renderCategories();
+        renderEndpoints();
+      } catch (e) {
+        endpointContainer.innerHTML = "<p class='text-red-400'>Failed to load endpoints.</p>";
+      }
+    }
+
+    function renderCategories() {
+      categoriesContainer.innerHTML = "";
+      const cats = ["All", ...Object.keys(endpoints)];
+      cats.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.innerText = cat;
+        btn.className = `px-3 py-1 rounded ${cat === activeCategory ? "bg-indigo-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`;
+        btn.onclick = () => { activeCategory = cat; renderCategories(); renderEndpoints(); };
+        categoriesContainer.appendChild(btn);
+      });
+    }
+
+    function renderEndpoints() {
+      endpointContainer.innerHTML = "";
+      const query = searchInput.value.toLowerCase();
+      const cats = activeCategory === "All" ? Object.keys(endpoints) : [activeCategory];
+
+      cats.forEach(cat => {
+        endpoints[cat].forEach(ep => {
+          if (ep.name.toLowerCase().includes(query) || ep.desc.toLowerCase().includes(query)) {
+            const card = document.createElement("div");
+            card.className = "card bg-gray-800 p-4 rounded flex justify-between items-center";
+            card.innerHTML = `
+              <div>
+                <h4 class="font-bold text-lg">${ep.name}</h4>
+                <p class="text-gray-400 text-sm">${ep.desc}</p>
+              </div>
+              <button class="btn" onclick="tryIt('${ep.path}', '${ep.name}')">Try It →</button>
+            `;
+            endpointContainer.appendChild(card);
+          }
+        });
+      });
+    }
+
+    async function tryIt(path, name) {
+      modalTitle.innerText = "GET " + path;
+      try {
+        const res = await axios.get(path);
+        modalResponse.innerText = JSON.stringify(res.data, null, 2);
+      } catch (err) {
+        modalResponse.innerText = "Error: " + err;
+      }
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function closeModal() {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    searchInput.addEventListener("input", renderEndpoints);
+    loadEndpoints();
+  </script>
+</body>
+</html>
